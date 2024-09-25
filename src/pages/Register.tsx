@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { database } from '../firebase'; // Correct import
+import { auth, database } from '../firebase'; // Correct import
 import { getRandomString } from '../Services/GetRandomNumber';
 import { getusers } from '../Services/GetUser.service';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
 
 const Register: React.FC = () => {
   const [firstname, setFirstname] = useState<string>('');
@@ -20,7 +21,7 @@ const Register: React.FC = () => {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-
+  
     if (
       !firstname ||
       !lastname ||
@@ -32,12 +33,12 @@ const Register: React.FC = () => {
       setMessage('Incomplete information');
       return;
     }
-
+  
     if (password !== confirmPassword) {
       setMessage('Passwords do not match');
       return;
     }
-
+  
     getusers(email, (res: any[]) => {
       const existingUser = res.find((user) => user.email === email);
       if (existingUser) {
@@ -45,30 +46,36 @@ const Register: React.FC = () => {
         return;
       }
     });
-
+  
     try {
       setLoading(true);
-
+  
+      // Create user with email and password using Firebase Auth
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const userAuth = userCredential.user;
+  
       const user = {
-        id: getRandomString(35, '1234567890qwertyuiopasdfhjklzxcvbnmQWERTYUIOPASDFHJKLZXCVBNM'),
+        id: userAuth.uid,  // Use Firebase Auth's UID for user ID
         firstname,
         lastname,
         email,
-        phone:number,
+        phone: number,
         active: true,
-        permission: 'user',
+        permission: 'admin',
         wallet: 0,
         created: serverTimestamp(),
-        amountSpend:0,
-        totalRequest: 0,
+        amountSpend: 0,
         accountNumber: "30"+getRandomString(8, '1234567890'),
+        totalRequest: 0,
         totalSpent: 0,
       };
-
+  
+      // Save user data in Firestore
       await setDoc(doc(database, 'user', user.id), user);
+  
       setMessage('Registration successful. Redirecting to login...');
       setTimeout(() => {
-        window.location.href = '/auth/login';
+        window.location.href = '/login';
       }, 2000);
     } catch (error) {
       setMessage((error as Error).message);
